@@ -1,5 +1,14 @@
 # Develop in VM
 
+CS 104 user, code: developer
+
+## user authenticate
+
+make file, run serverM, serverA, and then ./client HannahWilliams598 pQQdZC2e2pjQ
+see result
+
+## flow
+
 Week 1 (Days 1-5): Foundation and Basic Setup
     Days 1-2: Project Setup and Planning
         Set up development environment in Ubuntu
