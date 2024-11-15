@@ -2,10 +2,97 @@
 
 CS 104 user, code: developer
 
-## user authenticate
+## Test user authenticate
 
-make file, run serverM, serverA, and then ./client HannahWilliams598 pQQdZC2e2pjQ
-see result
+```bash
+make
+# Terminal 1
+./serverM
+
+# Terminal 2
+./serverA
+
+# Terminal 3
+./client guest guest
+
+# Terminal 3
+./client HannahWilliams598 pQQdZC2e2pjQ
+```
+
+## Test repo operations
+
+```bash
+# Terminal 1
+./serverM
+
+# Terminal 2
+./serverA
+
+# Terminal 3
+./serverR
+
+# Terminal 4
+./serverD
+```
+
+```bash
+# Terminal 5(member)
+./client HannahWilliams598 pQQdZC2e2pjQ
+
+# Test lookup(if member can lookup without username to lookup own repo)
+lookup alice
+lookup bob
+
+# Test push
+push newfile.cpp
+
+# Test remove
+remove test1.cpp
+
+# Test deploy
+deploy
+```
+
+For lookup:
+```bash
+# ServerR Terminal
+Server R has received a lookup request from the main server.
+Server R has finished sending the response to the main server.
+
+# Client Terminal
+The client received the response from the main server using TCP over port <port>
+test1.cpp
+test2.cpp
+----Start a new request----
+```
+
+For push:
+```bash
+# ServerR Terminal
+Server R has received a push request from the main server.
+newfile.cpp uploaded successfully.
+
+# Client Terminal
+newfile.cpp pushed successfully
+```
+
+For deploy:
+```bash
+# ServerR Terminal
+Server R has received a deploy request from the main server.
+Server R has finished sending the response to the main server.
+
+# ServerD Terminal
+Server D has received a deploy request from the main server.
+Server D has deployed the user alices repository.
+
+# Client Terminal
+The following files have been deployed:
+test1.cpp
+test2.cpp
+newfile.cpp
+----Start a new request----
+```
 
 ## flow
 

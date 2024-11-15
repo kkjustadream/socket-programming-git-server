@@ -9,6 +9,8 @@
 #include <sstream>
 #include <string>
 
+#define SERVER_A_PORT 21207
+
 // Function to encrypt password according to the scheme
 std::string encryptPassword(const std::string& password) {
     std::string encrypted = password;
@@ -38,9 +40,8 @@ bool authenticateUser(const std::string& username, const std::string& password) 
 
     std::string line;
     std::string encrypted_pass = encryptPassword(password);
-    // Add debug print in ServerA
-    std::cout << "Debug: Original password: " << password << std::endl;
-    std::cout << "Debug: Encrypted password: " << encrypted_pass << std::endl;
+    // std::cout << "Debug: Original password: " << password << std::endl;
+    // std::cout << "Debug: Encrypted password: " << encrypted_pass << std::endl;
 
     while (std::getline(file, line)) {
         std::istringstream iss(line);
@@ -71,7 +72,7 @@ int main()
     struct sockaddr_in serverAddr;
     memset(&serverAddr, 0, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(21207); // Your port based on USC ID
+    serverAddr.sin_port = htons(SERVER_A_PORT); // Your port based on USC ID
     serverAddr.sin_addr.s_addr = INADDR_ANY;
 
     // Bind socket
@@ -83,24 +84,6 @@ int main()
     }
 
     std::cout << "Server A is up and running using UDP on port 21207" << std::endl;
-
-    // Test //
-    // After printing "Server A is up and running..."
-    struct sockaddr_in mainServer;
-    mainServer.sin_family = AF_INET;
-    mainServer.sin_port = htons(24207);
-    mainServer.sin_addr.s_addr = inet_addr("127.0.0.1");
-
-    // Send test message to main server
-    const char *testMsg = "Test from Server A";
-    ssize_t sent_bytes = sendto(udpSocket, testMsg, strlen(testMsg), 0,
-                                (struct sockaddr *)&mainServer, sizeof(mainServer));
-
-    if (sent_bytes < 0)
-    {
-        std::cerr << "Failed to send message to Server M" << std::endl;
-    }
-
 
     // Main server loop
     while (true)
@@ -126,7 +109,7 @@ int main()
             // Print received authentication request
             std::string hidden_password(password.length(), '*');
             std::cout << "ServerA received username " << username 
-                      << " and password " << password << std::endl;
+                      << " and password " << hidden_password << std::endl;
 
             // 2. Check credentials
             // Authenticate user

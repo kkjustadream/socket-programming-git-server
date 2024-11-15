@@ -2,7 +2,7 @@
 CC = g++
 
 # Compiler flags
-CFLAGS = -Wall -g
+CFLAGS = -Wall -g -std=c++11
 
 # Source files
 SOURCES = serverM.cpp serverA.cpp serverR.cpp serverD.cpp client.cpp
