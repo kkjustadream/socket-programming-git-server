@@ -30,9 +30,15 @@ private:
 
     void saveFilenames() {
         std::ofstream file("filenames.txt");
+        if (!file.is_open()) {
+            std::cerr << "Error: Could not open filenames.txt for writing" << std::endl;
+            return;
+        }
+        // Write each username and filename pair
         for (const auto& user : userFiles) {
+            const std::string& username = user.first;  // Get username
             for (const auto& filename : user.second) {
-                file << user.first << " " << filename << "\n";
+                file << username << " " << filename << "\n";  // Write "username filename" format
             }
         }
         file.close();
@@ -99,19 +105,26 @@ public:
             }
         }
 
-        // Add new file
+        // Debug print
+        std::cout << "Debug - Pushing file: username='" << username << "' filename='" << filename << "'" << std::endl;
+
+        // Add new file to user's repository
         userFiles[username].push_back(filename);
+        // Save to filenames.txt
         saveFilenames();
         std::cout << filename << " uploaded successfully." << std::endl;
         return "success";
     }
 
-    void handleOverwrite(const std::string& username, const std::string& filename, 
+    std::string handleOverwrite(const std::string& username, const std::string& filename, 
                         const std::string& confirm) {
         if (confirm == "Y" || confirm == "y") {
-            std::cout << "User requested overwrite; overwrite successful." << std::endl;
+            std::cout << "User requested overwrite; overwrite successful." << std::endl;        
+            // File already exists in userFiles, no need to add again
+            return "success";
         } else {
             std::cout << "Overwrite denied" << std::endl;
+            return "Overwrite denied";
         }
     }
 
@@ -161,6 +174,12 @@ public:
             
             if (bytesReceived > 0) {
                 std::string request(buffer);
+
+
+                // Debug print
+                std::cout << "Debug - Received request: '" << request << "'" << std::endl;
+
+
                 std::string response;
                 std::istringstream iss(request);
                 std::string command, username, filename;
@@ -176,8 +195,10 @@ public:
                 }
                 else if (command == "overwrite") {
                     iss >> username >> filename >> command;
-                    handleOverwrite(username, filename, command);
-                    continue;
+                    std::cout << "username: " << username << std::endl;
+                    std::cout << "filename: " << filename << std::endl;
+                    std::cout << "command: " << command << std::endl;
+                    response = handleOverwrite(username, filename, command);
                 }
                 else if (command == "remove") {
                     iss >> username >> filename;

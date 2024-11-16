@@ -65,7 +65,7 @@ int main() {
     }
 
     if (bind(tcpSocket, (struct sockaddr*)&tcpAddr, sizeof(tcpAddr)) < 0) {
-        std::cerr << "TCP bind failed" << std::endl;
+        std::cerr << "TCP bind failed: " << strerror(errno) << std::endl;
         return 1;
     }
 
@@ -155,15 +155,15 @@ int main() {
                 iss >> first_word;    
                 
                 // Debug
-                // std::cout << "\n=== Command Debug Info ===" << std::endl;
-                // std::cout << "Raw message: '" << message << "'" << std::endl;
-                // std::cout << "Command: '" << first_word << "'" << std::endl;
-                // std::cout << "======================" << std::endl;
+                std::cout << "\n=== Command Debug Info ===" << std::endl;
+                std::cout << "Raw message: '" << message << "'" << std::endl;
+                std::cout << "Command: '" << first_word << "'" << std::endl;
+                std::cout << "======================" << std::endl;
 
                 // Check if this is a command or authentication request
                 if (first_word == "lookup" || first_word == "push" || 
                     first_word == "deploy" || first_word == "remove") {
-                    // Verify client is authenticated
+                    // Verify client is authenticated (will we get here? if not auth the client side will close?)
                     if (authenticatedClients.find(clientSocket) == authenticatedClients.end()) {
                         std::string error = "Error: Not authenticated";
                         send(clientSocket, error.c_str(), error.length(), 0);
@@ -175,11 +175,21 @@ int main() {
                     iss >> param;  // Get second parameter (username or filename)
 
                     if (first_word == "lookup") {
-                        if (param.empty()) {
+                        if (param.empty() && !client.isGuest) {
+                            // For members, if no username specified, use their own username
+                            std::cout << "Username is not specified. Will lookup " << client.username << "." << std::endl;
+                            std::string newMessage(buffer);
+                            newMessage = "lookup " + client.username;
+                            handleLookupRequest(udpSocket, clientSocket, newMessage, client.username, false);
+                        }
+                        else if (param.empty() && client.isGuest) {
+                            // For guests, username must be specified
                             std::string error = "Error: Username is required. Please specify a username to lookup.";
                             send(clientSocket, error.c_str(), error.length(), 0);
-                        } else {
-                            handleLookupRequest(udpSocket, clientSocket, message, param, client.isGuest); // Set isGuest based on authentication
+                        }
+                        else {
+                            // Username is specified for either guest or member
+                            handleLookupRequest(udpSocket, clientSocket, message, param, client.isGuest);
                         }
                     }
                     // Member-only commands
@@ -189,19 +199,22 @@ int main() {
                                 std::string error = "Error: Filename is required. Please specify a filename to push.";
                                 send(clientSocket, error.c_str(), error.length(), 0);
                             } else {
-                                handlePushRequest(udpSocket, clientSocket, message, "username"); // Replace with actual username
+                                // Create new message with username
+                                std::string serverR_message = "push " + client.username + " " + param;
+                                std::cout << "push serverR_message: '" << serverR_message << "'" << std::endl;
+                                handlePushRequest(udpSocket, clientSocket, serverR_message, client.username); 
                             }
-                        }
-                        else if (first_word == "deploy") {
-                            handleDeployRequest(udpSocket, clientSocket, message, "username"); // Replace with actual username
                         }
                         else if (first_word == "remove") {
                             if (param.empty()) {
                                 std::string error = "Error: Filename is required for remove operation.";
                                 send(clientSocket, error.c_str(), error.length(), 0);
                             } else {
-                                handleRemoveRequest(udpSocket, clientSocket, message, "username"); // Replace with actual username
+                                handleRemoveRequest(udpSocket, clientSocket, message, client.username);
                             }
+                        }
+                        else if (first_word == "deploy") {
+                            handleDeployRequest(udpSocket, clientSocket, message, client.username);
                         }
                     }
                     else {
@@ -357,18 +370,39 @@ void handlePushRequest(int udpSocket, int clientSocket, const std::string& reque
         std::cout << "The main server has sent the overwrite confirmation request to the client." << std::endl;
         send(clientSocket, buffer, bytes, 0);
 
-        // Wait for client's response
+        // Wait for client's Y/N response
         memset(buffer, 0, BUFFER_SIZE);
         bytes = recv(clientSocket, buffer, BUFFER_SIZE, 0);
         
         std::cout << "The main server has received the overwrite confirmation response from "
                   << username << " using TCP over port " << TCP_PORT << std::endl;
 
+        // Parse the original push request to get filename
+        std::istringstream iss(request);
+        std::string command, username_from_req, filename;
+        iss >> command >> username_from_req >> filename;
+
+        // Create overwrite command message for Server R
+        std::string overwriteMsg = "overwrite " + username + " " + filename + " " + std::string(buffer);
+        std::cout << "overwriteMsg: " << overwriteMsg << std::endl;
+
         // Forward confirmation to Server R
         std::cout << "The main server has sent the overwrite confirmation response to server R." << std::endl;
-        sendto(udpSocket, buffer, bytes, 0,
+        sendto(udpSocket, overwriteMsg.c_str(), overwriteMsg.length(), 0,
                (struct sockaddr*)&serverR_addr, sizeof(serverR_addr));
-    } else {
+
+        // Get final response from Server R
+        memset(buffer, 0, BUFFER_SIZE);
+        bytes = recvfrom(udpSocket, buffer, BUFFER_SIZE, 0,
+                        (struct sockaddr*)&responseAddr, &responseLen);
+
+        // Forward final response to client
+        send(clientSocket, buffer, bytes, 0);
+        std::cout << "The main server has sent the response to the client." << std::endl;
+    } else {        
+        // Print message for normal response
+        std::cout << "The main server has received the response from server R using UDP over "
+                  << UDP_PORT << std::endl;
         // Forward response to client
         send(clientSocket, buffer, bytes, 0);
         std::cout << "The main server has sent the response to the client." << std::endl;

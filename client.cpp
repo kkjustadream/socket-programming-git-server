@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <cstring>
 #include <unistd.h>
+#include <sstream>
 
 #define BUFFER_SIZE 1024
 #define SERVER_M_PORT 25207
@@ -114,25 +115,53 @@ int main(int argc, char *argv[]) {
             // Send command to server
             send(tcpSocket, command.c_str(), command.length(), 0);
 
-            // Handle push command overwrite confirmation
-            if (command.substr(0, 4) == "push") {
-                memset(buffer, 0, sizeof(buffer));
-                bytes = recv(tcpSocket, buffer, sizeof(buffer), 0);
-                if (bytes > 0 && strstr(buffer, "exists")) {
-                    std::cout << buffer << std::endl;
-                    std::string confirm;
-                    std::getline(std::cin, confirm);
-                    send(tcpSocket, confirm.c_str(), confirm.length(), 0);
-                }
-            }
+            // Extract filename and username
+            std::istringstream iss(command);
+            std::string cmd, filename;
+            iss >> cmd >> filename;
 
             // Receive response
             memset(buffer, 0, sizeof(buffer));
             bytes = recv(tcpSocket, buffer, sizeof(buffer), 0);
-            if (bytes > 0) {
+            if (bytes > 0) {            
+                std::string response(buffer);
+
+                // Check if this is an overwrite confirmation request
+                if (response.find("exists") != std::string::npos) {
+                    // Print overwrite confirmation prompt
+                    std::cout << filename << " exists in " << username 
+                         << "'s repository, do you want to overwrite (Y/N)? ";
+                
+                    // Get user's response
+                    std::string confirm;
+                    std::getline(std::cin, confirm);
+
+                    // Send confirmation back to serverM
+                    send(tcpSocket, confirm.c_str(), confirm.length(), 0);
+
+                    // Wait for final response
+                    memset(buffer, 0, sizeof(buffer));
+                    bytes = recv(tcpSocket, buffer, sizeof(buffer), 0);
+                    response = buffer;
+                }
+                
                 std::cout << "The client received the response from the main server using TCP over port "
-                         << clientPort << std::endl;
-                std::cout << buffer << std::endl;
+                        << clientPort << std::endl;
+
+                // Format success/failure message
+                if (cmd == "push") {
+                    if (response == "success") {
+                        std::cout << filename << " pushed successfully" << std::endl;
+                    } 
+                    else {
+                        std::cout << filename << " was not pushed successfully" << std::endl;
+                    }
+                } 
+                // will get here?
+                else {
+                    std::cout << response << std::endl;
+                }
+
                 std::cout << "----Start a new request----" << std::endl;
             }
         }
