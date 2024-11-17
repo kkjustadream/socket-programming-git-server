@@ -202,6 +202,8 @@ public:
                 }
                 else if (command == "remove") {
                     iss >> username >> filename;
+                    std::cout << "username: " << username << std::endl;
+                    std::cout << "filename: " << filename << std::endl;
                     response = handleRemove(username, filename);
                 }
                 else if (command == "deploy") {

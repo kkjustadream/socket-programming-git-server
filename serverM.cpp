@@ -199,7 +199,7 @@ int main() {
                                 std::string error = "Error: Filename is required. Please specify a filename to push.";
                                 send(clientSocket, error.c_str(), error.length(), 0);
                             } else {
-                                // Create new message with username
+                                // Create new message with username for serverR usage
                                 std::string serverR_message = "push " + client.username + " " + param;
                                 std::cout << "push serverR_message: '" << serverR_message << "'" << std::endl;
                                 handlePushRequest(udpSocket, clientSocket, serverR_message, client.username); 
@@ -209,7 +209,8 @@ int main() {
                             if (param.empty()) {
                                 std::string error = "Error: Filename is required for remove operation.";
                                 send(clientSocket, error.c_str(), error.length(), 0);
-                            } else {
+                            } 
+                            else {
                                 handleRemoveRequest(udpSocket, clientSocket, message, client.username);
                             }
                         }
@@ -409,57 +410,6 @@ void handlePushRequest(int udpSocket, int clientSocket, const std::string& reque
     }
 }
 
-void handleDeployRequest(int udpSocket, int clientSocket, const std::string& request,
-                        const std::string& username) {
-    // First contact Server R to get files
-    struct sockaddr_in serverR_addr;
-    serverR_addr.sin_family = AF_INET;
-    serverR_addr.sin_port = htons(22207);
-    serverR_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-
-    std::cout << "The main server has received a deploy request from member " << username 
-              << " TCP over port " << TCP_PORT << "." << std::endl;
-
-    // Forward request to Server R
-    std::cout << "The main server has sent the lookup request to server R." << std::endl;
-    sendto(udpSocket, request.c_str(), request.length(), 0,
-           (struct sockaddr*)&serverR_addr, sizeof(serverR_addr));
-
-    // Get response from Server R
-    char buffer[BUFFER_SIZE] = {0};
-    struct sockaddr_in responseAddr;
-    socklen_t responseLen = sizeof(responseAddr);
-    
-    ssize_t bytes = recvfrom(udpSocket, buffer, BUFFER_SIZE, 0,
-                            (struct sockaddr*)&responseAddr, &responseLen);
-
-    std::cout << "The main server received the lookup response from server R." << std::endl;
-
-    // Forward to Server D if files exist
-    if (strcmp(buffer, "empty") != 0) {
-        struct sockaddr_in serverD_addr;
-        serverD_addr.sin_family = AF_INET;
-        serverD_addr.sin_port = htons(23207);
-        serverD_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-
-        std::string deployRequest = username + " " + std::string(buffer);
-        std::cout << "The main server has sent the deploy request to server D." << std::endl;
-        
-        sendto(udpSocket, deployRequest.c_str(), deployRequest.length(), 0,
-               (struct sockaddr*)&serverD_addr, sizeof(serverD_addr));
-
-        // Get confirmation from Server D
-        memset(buffer, 0, BUFFER_SIZE);
-        bytes = recvfrom(udpSocket, buffer, BUFFER_SIZE, 0,
-                        (struct sockaddr*)&responseAddr, &responseLen);
-
-        std::cout << "The user " << username << "'s repository has been deployed at server D." << std::endl;
-    }
-
-    // Send final response to client
-    send(clientSocket, buffer, bytes, 0);
-}
-
 void handleRemoveRequest(int udpSocket, int clientSocket, const std::string& request,
                         const std::string& username) {
     // Print initial message
@@ -477,8 +427,12 @@ void handleRemoveRequest(int udpSocket, int clientSocket, const std::string& req
     std::string command, filename;
     iss >> command >> filename;
 
+    // Create new message with username for serverR usage
+    std::string serverR_message = "remove " + username + " " + filename;
+    std::cout << "serverR_message: " << serverR_message << std::endl;
+
     // Send request to Server R
-    sendto(udpSocket, request.c_str(), request.length(), 0,
+    sendto(udpSocket, serverR_message.c_str(), serverR_message.length(), 0,
            (struct sockaddr*)&serverR_addr, sizeof(serverR_addr));
 
     // Wait for Server R's response
@@ -507,3 +461,69 @@ void handleRemoveRequest(int udpSocket, int clientSocket, const std::string& req
         }
     }
 }
+
+void handleDeployRequest(int udpSocket, int clientSocket, const std::string& request,
+                        const std::string& username) {
+    // First contact Server R to get files
+    struct sockaddr_in serverR_addr;
+    serverR_addr.sin_family = AF_INET;
+    serverR_addr.sin_port = htons(22207);
+    serverR_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+    std::cout << "The main server has received a deploy request from member " << username 
+              << " TCP over port " << TCP_PORT << "." << std::endl;
+
+    // Create new message for serverR usage to lookup
+    std::string serverR_message = "lookup " + username;
+
+    // Forward request to Server R
+    std::cout << "The main server has sent the lookup request to server R." << std::endl;
+    sendto(udpSocket, serverR_message.c_str(), serverR_message.length(), 0,
+           (struct sockaddr*)&serverR_addr, sizeof(serverR_addr));
+
+    // Get response(file list) from Server R
+    char buffer[BUFFER_SIZE] = {0};
+    struct sockaddr_in responseAddr;
+    socklen_t responseLen = sizeof(responseAddr);
+    
+    ssize_t bytes = recvfrom(udpSocket, buffer, BUFFER_SIZE, 0,
+                            (struct sockaddr*)&responseAddr, &responseLen);
+
+    std::cout << "The main server received the lookup response from server R." << std::endl;
+
+    // Store the file list from Server R
+    std::string fileList(buffer, bytes);  // Use bytes to create string
+
+    // Forward to Server D if files exist
+    if (strcmp(buffer, "empty") != 0) {
+        struct sockaddr_in serverD_addr;
+        serverD_addr.sin_family = AF_INET;
+        serverD_addr.sin_port = htons(23207);
+        serverD_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+        std::string deployRequest = username + " " + std::string(buffer);
+        std::cout << "The main server has sent the deploy request to server D." << std::endl;
+        
+        sendto(udpSocket, deployRequest.c_str(), deployRequest.length(), 0,
+               (struct sockaddr*)&serverD_addr, sizeof(serverD_addr));
+
+        // Get confirmation from Server D
+        memset(buffer, 0, BUFFER_SIZE);
+        bytes = recvfrom(udpSocket, buffer, BUFFER_SIZE, 0,
+                        (struct sockaddr*)&responseAddr, &responseLen);
+
+        std::cout << "The user " << username << "'s repository has been deployed at server D." << std::endl;
+
+        // Create response message for client with list of deployed files
+        std::string clientResponse = "The following files in his/her repository have been deployed.\n" + fileList;
+        send(clientSocket, clientResponse.c_str(), clientResponse.length(), 0);
+    }
+    // Need? No file to deploy, empty repository
+    else {
+        std::cout << "No file to deploy" << std::endl;
+        std::string errorMsg = "Empty repository";
+        send(clientSocket, errorMsg.c_str(), errorMsg.length(), 0);
+    }
+}
+
+

@@ -6,6 +6,10 @@ CS 104 user, code: developer
 
 need multi-clients, fix serverM
 
+using namespace std;
+
+invalid input
+
 ## Test user authenticate
 
 ```bash

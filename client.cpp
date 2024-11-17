@@ -126,7 +126,7 @@ int main(int argc, char *argv[]) {
             if (bytes > 0) {            
                 std::string response(buffer);
 
-                // Check if this is an overwrite confirmation request
+                // For push cmd, Check if this is an overwrite confirmation request
                 if (response.find("exists") != std::string::npos) {
                     // Print overwrite confirmation prompt
                     std::cout << filename << " exists in " << username 
@@ -156,10 +156,32 @@ int main(int argc, char *argv[]) {
                     else {
                         std::cout << filename << " was not pushed successfully" << std::endl;
                     }
-                } 
-                // will get here?
+                }
+                else if (cmd == "deploy") {
+                    if (response == "Empty repository.") {
+                        std::cout << response << std::endl;
+                    } else {
+                        // Response already contains "The following files..." header
+                        // Parse and print each line
+                        std::istringstream iss(response);
+                        std::string line;
+                        
+                        // Print the header line
+                        std::getline(iss, line);
+                        std::cout << line << std::endl;  // Prints "The following files..."
+                        
+                        // Print each filename
+                        while (std::getline(iss, line)) {
+                            if (!line.empty()) {
+                                std::cout << line << std::endl;
+                            }
+                        }
+                    }
+                }
+                // lookup, remove will get here
                 else {
-                    std::cout << response << std::endl;
+                    // std::cout << response << std::endl;
+                    
                 }
 
                 std::cout << "----Start a new request----" << std::endl;
