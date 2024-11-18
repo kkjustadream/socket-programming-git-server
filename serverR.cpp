@@ -77,15 +77,18 @@ public:
         
         std::string response;
         if (userFiles.find(username) == userFiles.end()) {
-            response = username + " does not exist";
+            response = username + " does not exist. Please try again.";
         } else if (userFiles[username].empty()) {
-            response = "Empty repository";
+            response = "Empty repository.";
         } else {
             for (const auto& file : userFiles[username]) {
                 response += file + "\n";
+            }       
+            // Remove trailing newline if exists
+            if (!response.empty() && response.back() == '\n') {
+                response.pop_back();
             }
         }
-        
         std::cout << "Server R has finished sending the response to the main server." << std::endl;
         return response;
     }
@@ -106,7 +109,7 @@ public:
         }
 
         // Debug print
-        std::cout << "Debug - Pushing file: username='" << username << "' filename='" << filename << "'" << std::endl;
+        //std::cout << "Debug - Pushing file: username='" << username << "' filename='" << filename << "'" << std::endl;
 
         // Add new file to user's repository
         userFiles[username].push_back(filename);
@@ -177,7 +180,7 @@ public:
 
 
                 // Debug print
-                std::cout << "Debug - Received request: '" << request << "'" << std::endl;
+                //std::cout << "Debug - Received request: '" << request << "'" << std::endl;
 
 
                 std::string response;
@@ -195,15 +198,10 @@ public:
                 }
                 else if (command == "overwrite") {
                     iss >> username >> filename >> command;
-                    std::cout << "username: " << username << std::endl;
-                    std::cout << "filename: " << filename << std::endl;
-                    std::cout << "command: " << command << std::endl;
                     response = handleOverwrite(username, filename, command);
                 }
                 else if (command == "remove") {
                     iss >> username >> filename;
-                    std::cout << "username: " << username << std::endl;
-                    std::cout << "filename: " << filename << std::endl;
                     response = handleRemove(username, filename);
                 }
                 else if (command == "deploy") {

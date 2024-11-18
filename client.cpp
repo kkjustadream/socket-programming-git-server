@@ -112,7 +112,7 @@ int main(int argc, char *argv[]) {
             std::string command;
             std::getline(std::cin, command);
 
-            // Send command to server
+            // Send command to serverM
             send(tcpSocket, command.c_str(), command.length(), 0);
 
             // Extract filename and username
@@ -120,17 +120,22 @@ int main(int argc, char *argv[]) {
             std::string cmd, filename;
             iss >> cmd >> filename;
 
+            if (cmd == "lookup") {
+                if (filename.empty()) {
+                    std::cout << "Username is not specified. Will lookup " << username << "." << std::endl;
+                }
+                std::cout << username << " sent a lookup request to the main server." << std::endl;
+            }
+
             // Receive response
             memset(buffer, 0, sizeof(buffer));
             bytes = recv(tcpSocket, buffer, sizeof(buffer), 0);
             if (bytes > 0) {            
                 std::string response(buffer);
-
-                // For push cmd, Check if this is an overwrite confirmation request
-                if (response.find("exists") != std::string::npos) {
+                if (response == "exists") {
                     // Print overwrite confirmation prompt
                     std::cout << filename << " exists in " << username 
-                         << "'s repository, do you want to overwrite (Y/N)? ";
+                        << "'s repository, do you want to overwrite (Y/N)? ";
                 
                     // Get user's response
                     std::string confirm;
@@ -144,12 +149,12 @@ int main(int argc, char *argv[]) {
                     bytes = recv(tcpSocket, buffer, sizeof(buffer), 0);
                     response = buffer;
                 }
-                
-                std::cout << "The client received the response from the main server using TCP over port "
-                        << clientPort << std::endl;
 
-                // Format success/failure message
-                if (cmd == "push") {
+                if (cmd == "lookup") {
+                    std::cout << "The client received the response from the main server using TCP over port " << clientPort << std::endl;
+                    std::cout << response << std::endl;
+                }
+                else if (cmd == "push") {
                     if (response == "success") {
                         std::cout << filename << " pushed successfully" << std::endl;
                     } 
@@ -158,6 +163,8 @@ int main(int argc, char *argv[]) {
                     }
                 }
                 else if (cmd == "deploy") {
+                    std::cout << username << " sent a lookup request to the main server." << std::endl;
+                    std::cout << "The client received the response from the main server using TCP over port " << clientPort << std::endl;
                     if (response == "Empty repository.") {
                         std::cout << response << std::endl;
                     } else {
@@ -178,10 +185,11 @@ int main(int argc, char *argv[]) {
                         }
                     }
                 }
-                // lookup, remove will get here
+                else if (cmd == "remove") {
+                    std::cout << response << std::endl;
+                }
                 else {
-                    // std::cout << response << std::endl;
-                    
+                    std::cout << response << std::endl;
                 }
 
                 std::cout << "----Start a new request----" << std::endl;

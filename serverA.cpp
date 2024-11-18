@@ -40,8 +40,6 @@ bool authenticateUser(const std::string& username, const std::string& password) 
 
     std::string line;
     std::string encrypted_pass = encryptPassword(password);
-    // std::cout << "Debug: Original password: " << password << std::endl;
-    // std::cout << "Debug: Encrypted password: " << encrypted_pass << std::endl;
 
     while (std::getline(file, line)) {
         std::istringstream iss(line);
@@ -72,7 +70,7 @@ int main()
     struct sockaddr_in serverAddr;
     memset(&serverAddr, 0, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(SERVER_A_PORT); // Your port based on USC ID
+    serverAddr.sin_port = htons(SERVER_A_PORT);
     serverAddr.sin_addr.s_addr = INADDR_ANY;
 
     // Bind socket
@@ -100,7 +98,6 @@ int main()
         {
             buffer[bytesReceived] = '\0';
             // Process authentication request
-            // 1. Read from members.txt
             // Parse username and password from received message
             std::string msg(buffer);
             std::istringstream iss(msg);
@@ -110,11 +107,9 @@ int main()
             std::string hidden_password(password.length(), '*');
             std::cout << "ServerA received username " << username 
                       << " and password " << hidden_password << std::endl;
-
-            // 2. Check credentials
             // Authenticate user
             bool isAuthenticated = authenticateUser(username, password);
-            // 3. Send response back to Main Server            
+            // Send response back to Main Server            
             std::string response;
             if (isAuthenticated) {
                 std::cout << "Member " << username << " has been authenticated" << std::endl;
@@ -129,7 +124,7 @@ int main()
         }
     }
 
-    // Cleanup (this won't be reached unless you break the loop)
+    // Cleanup
     close(udpSocket);
     return 0;
 }

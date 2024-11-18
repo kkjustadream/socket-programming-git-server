@@ -116,10 +116,6 @@ int main() {
                     std::cout << "The main server has received the response from server A using UDP over "
                              << UDP_PORT << std::endl;
                 }
-                else if (senderPort == 22207) { // Server R
-                    std::cout << "The main server has received the response from server R using UDP over "
-                             << UDP_PORT << std::endl;
-                }
                 else if (senderPort == 23207) { // Server D
                     std::cout << "The user's repository has been deployed at server D." << std::endl;
                 }
@@ -136,7 +132,6 @@ int main() {
                 std::cerr << "Accept failed" << std::endl;
                 continue;
             }
-            std::cout << "Server M received connection from client" << std::endl;
 
             // Keep connection alive for multiple commands
             while (true) {
@@ -155,15 +150,15 @@ int main() {
                 iss >> first_word;    
                 
                 // Debug
-                std::cout << "\n=== Command Debug Info ===" << std::endl;
-                std::cout << "Raw message: '" << message << "'" << std::endl;
-                std::cout << "Command: '" << first_word << "'" << std::endl;
-                std::cout << "======================" << std::endl;
+                //std::cout << "\n=== Command Debug Info ===" << std::endl;
+                //std::cout << "Raw message: '" << message << "'" << std::endl;
+                //std::cout << "Command: '" << first_word << "'" << std::endl;
+                //std::cout << "======================" << std::endl;
 
                 // Check if this is a command or authentication request
                 if (first_word == "lookup" || first_word == "push" || 
                     first_word == "deploy" || first_word == "remove") {
-                    // Verify client is authenticated (will we get here? if not auth the client side will close?)
+                    // Verify client is authenticated, without auth and type cmd
                     if (authenticatedClients.find(clientSocket) == authenticatedClients.end()) {
                         std::string error = "Error: Not authenticated";
                         send(clientSocket, error.c_str(), error.length(), 0);
@@ -177,7 +172,6 @@ int main() {
                     if (first_word == "lookup") {
                         if (param.empty() && !client.isGuest) {
                             // For members, if no username specified, use their own username
-                            std::cout << "Username is not specified. Will lookup " << client.username << "." << std::endl;
                             std::string newMessage(buffer);
                             newMessage = "lookup " + client.username;
                             handleLookupRequest(udpSocket, clientSocket, newMessage, client.username, false);
@@ -201,7 +195,6 @@ int main() {
                             } else {
                                 // Create new message with username for serverR usage
                                 std::string serverR_message = "push " + client.username + " " + param;
-                                std::cout << "push serverR_message: '" << serverR_message << "'" << std::endl;
                                 handlePushRequest(udpSocket, clientSocket, serverR_message, client.username); 
                             }
                         }
@@ -385,7 +378,6 @@ void handlePushRequest(int udpSocket, int clientSocket, const std::string& reque
 
         // Create overwrite command message for Server R
         std::string overwriteMsg = "overwrite " + username + " " + filename + " " + std::string(buffer);
-        std::cout << "overwriteMsg: " << overwriteMsg << std::endl;
 
         // Forward confirmation to Server R
         std::cout << "The main server has sent the overwrite confirmation response to server R." << std::endl;
@@ -429,7 +421,6 @@ void handleRemoveRequest(int udpSocket, int clientSocket, const std::string& req
 
     // Create new message with username for serverR usage
     std::string serverR_message = "remove " + username + " " + filename;
-    std::cout << "serverR_message: " << serverR_message << std::endl;
 
     // Send request to Server R
     sendto(udpSocket, serverR_message.c_str(), serverR_message.length(), 0,
