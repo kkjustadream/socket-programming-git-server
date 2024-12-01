@@ -213,11 +213,6 @@ int main() {
                             newMessage = "lookup " + client.username;
                             handleLookupRequest(udpSocket, sock, newMessage, client.username, false);
                         }
-                        else if (param.empty() && client.isGuest) {
-                            // For guests, username must be specified
-                            std::string error = "Error: Username is required. Please specify a username to lookup.";
-                            send(sock, error.c_str(), error.length(), 0);
-                        }
                         else {
                             // Username is specified for either guest or member
                             handleLookupRequest(udpSocket, sock, message, param, client.isGuest);
@@ -225,28 +220,17 @@ int main() {
                     }
                     else if (!client.isGuest) {  // Member-only commands
                         if (first_word == "push") {
-                            if (param.empty()) {
-                                std::string error = "Error: Filename is required. Please specify a filename to push.";
-                                send(sock, error.c_str(), error.length(), 0);
-                            } else {
-                                // Create new message with username for serverR usage
-                                std::string serverR_message = "push " + client.username + " " + param;
-                                addToLog(client.username, "push " + param);
-                                handlePushRequest(udpSocket, sock, serverR_message, client.username); 
-                            }
+                            // Create new message with username for serverR usage
+                            std::string serverR_message = "push " + client.username + " " + param;
+                            addToLog(client.username, "push " + param);
+                            handlePushRequest(udpSocket, sock, serverR_message, client.username); 
                         }
                         else if (first_word == "deploy") {
                             addToLog(client.username, "deploy");
                             handleDeployRequest(udpSocket, sock, message, client.username);
                         }
                         else if (first_word == "remove") {
-                            if (param.empty()) {
-                                std::string error = "Error: Filename is required for remove operation.";
-                                send(sock, error.c_str(), error.length(), 0);
-                            } 
-                            else {
-                                handleRemoveRequest(udpSocket, sock, message, client.username);
-                            }
+                            handleRemoveRequest(udpSocket, sock, message, client.username);
                         }
                         else if (first_word == "log") {
                             addToLog(client.username, "log ");

@@ -6,6 +6,7 @@
 #include <cstring>
 #include <unistd.h>
 #include <sstream>
+#include <fstream>
 
 #define BUFFER_SIZE 1024
 #define SERVER_M_PORT 25207
@@ -82,9 +83,21 @@ int main(int argc, char *argv[]) {
             std::string command;
             std::getline(std::cin, command);
 
+            // Extract command and username
+            std::istringstream iss(command);
+            std::string cmd, username;
+            iss >> cmd >> username;
+
             // Validate guest command
-            if (command.substr(0, 6) != "lookup") {
+            if (cmd != "lookup") {
                 std::cout << "Guests can only use the lookup command" << std::endl;
+                std::cout << "----Start a new request----" << std::endl;
+                continue;
+            }
+
+            // Check if username is specified
+            if (username.empty()) {
+                std::cout << "Error: Username is required. Please specify a username to lookup." << std::endl;
                 std::cout << "----Start a new request----" << std::endl;
                 continue;
             }
@@ -113,13 +126,35 @@ int main(int argc, char *argv[]) {
             std::string command;
             std::getline(std::cin, command);
 
-            // Send command to serverM
-            send(tcpSocket, command.c_str(), command.length(), 0);
-
             // Extract filename and username
             std::istringstream iss(command);
             std::string cmd, filename;
             iss >> cmd >> filename;
+
+            // Handle commands that need pre-validation
+            if (cmd == "push") {
+                if (filename.empty()) {
+                    std::cout << "Error: Filename is required. Please specify a filename to push." << std::endl;
+                    std::cout << "----Start a new request----" << std::endl;
+                    continue;
+                }
+                // Check if file exists and is readable
+                std::ifstream file(filename);
+                if (!file.good()) {
+                    std::cout << "Error: Invalid file: " << filename << std::endl;
+                    std::cout << "----Start a new request----" << std::endl;
+                    continue;
+                }
+                file.close();
+            }
+            else if (cmd == "remove" && filename.empty()) {
+                std::cout << "Error: Filename is required for remove operation." << std::endl;
+                std::cout << "----Start a new request----" << std::endl;
+                continue;
+            }
+
+            // Send command to serverM
+            send(tcpSocket, command.c_str(), command.length(), 0);
 
             if (cmd == "lookup") {
                 if (filename.empty()) {
@@ -134,8 +169,8 @@ int main(int argc, char *argv[]) {
 
             if (bytes > 0) {            
                 std::string response(buffer);
+                // Handle overwrite confirmation
                 if (response == "exists") {
-                    // Print overwrite confirmation prompt
                     std::cout << filename << " exists in " << username 
                         << "'s repository, do you want to overwrite (Y/N)? ";
                 
@@ -157,10 +192,8 @@ int main(int argc, char *argv[]) {
                     std::cout << response << std::endl;
                 }
                 else if (cmd == "push") {
-                    if (filename.empty()) {
-                        std::cout << "Error: Filename is required. Please specify a filename to push." << std::endl;
-                    }
-                    else if (response == "success") {
+                    // File exists and is readable, proceed with push
+                    if (response == "success") {
                         std::cout << filename << " pushed successfully" << std::endl;
                     } 
                     else {
