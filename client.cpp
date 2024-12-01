@@ -35,8 +35,14 @@ int main(int argc, char *argv[]) {
     serverAddr.sin_port = htons(SERVER_M_PORT); // Main server's TCP port
     serverAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
+    // Connect to main server
+    if (connect(tcpSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) {
+        std::cerr << "Connection failed" << std::endl;
+        close(tcpSocket);
+        return 1;
+    }
 
-    // Get client port number
+    // Get client port number after connection
     struct sockaddr_in clientAddr;
     socklen_t clientLen = sizeof(clientAddr);
     if (getsockname(tcpSocket, (struct sockaddr*)&clientAddr, &clientLen) < 0) {
@@ -46,15 +52,8 @@ int main(int argc, char *argv[]) {
     }
     int clientPort = ntohs(clientAddr.sin_port);
 
-
-    // Connect to main server
-    if (connect(tcpSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) {
-        std::cerr << "Connection failed" << std::endl;
-        close(tcpSocket);
-        return 1;
-    }
-
     std::cout << "The client is up and running." << std::endl;
+    // std::cout << "clientPort: " << clientPort << std::endl;
 
     // Send credentials to server
     std::string auth_msg = username + " " + password;
@@ -72,6 +71,7 @@ int main(int argc, char *argv[]) {
 
     std::string response(buffer);
 
+
     // Process authentication response
     if (strcmp(buffer, "guest") == 0) {
         std::cout << "You have been granted guest access." << std::endl;
@@ -85,6 +85,7 @@ int main(int argc, char *argv[]) {
             // Validate guest command
             if (command.substr(0, 6) != "lookup") {
                 std::cout << "Guests can only use the lookup command" << std::endl;
+                std::cout << "----Start a new request----" << std::endl;
                 continue;
             }
 
@@ -108,7 +109,7 @@ int main(int argc, char *argv[]) {
         // Member command loop
         while (true) {
             std::cout << "Please enter the command: <lookup <username>> , <push <filename>> , "
-                     << "<remove <filename>> , <deploy>" << std::endl;
+                     << "<remove <filename>> , <deploy>, <log>" << std::endl;
             std::string command;
             std::getline(std::cin, command);
 
@@ -130,6 +131,7 @@ int main(int argc, char *argv[]) {
             // Receive response
             memset(buffer, 0, sizeof(buffer));
             bytes = recv(tcpSocket, buffer, sizeof(buffer), 0);
+
             if (bytes > 0) {            
                 std::string response(buffer);
                 if (response == "exists") {
@@ -155,7 +157,10 @@ int main(int argc, char *argv[]) {
                     std::cout << response << std::endl;
                 }
                 else if (cmd == "push") {
-                    if (response == "success") {
+                    if (filename.empty()) {
+                        std::cout << "Error: Filename is required. Please specify a filename to push." << std::endl;
+                    }
+                    else if (response == "success") {
                         std::cout << filename << " pushed successfully" << std::endl;
                     } 
                     else {
@@ -186,6 +191,13 @@ int main(int argc, char *argv[]) {
                     }
                 }
                 else if (cmd == "remove") {
+                    std::cout << username << " sent a remove request to the main server." << std::endl;
+                    std::cout << response << std::endl;
+                }
+                else if (cmd == "log") {
+                    std::cout << username << " sent a log request to the main server." << std::endl;
+                    std::cout << "The client received the response from the main server using TCP over port "
+                            << clientPort << std::endl;
                     std::cout << response << std::endl;
                 }
                 else {

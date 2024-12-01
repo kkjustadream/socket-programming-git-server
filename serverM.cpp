@@ -7,6 +7,9 @@
 #include <arpa/inet.h>
 #include <sstream>
 #include <map>
+#include <set>
+#include <vector>
+#include <ctime>
 
 #define TCP_PORT 25207
 #define UDP_PORT 24207
@@ -20,14 +23,24 @@ void handleDeployRequest(int udpSocket, int clientSocket, const std::string& req
                         const std::string& username);
 void handleRemoveRequest(int udpSocket, int clientSocket, const std::string& request,
                         const std::string& username);
+void handleLogRequest(int clientSocket, const std::string& username);
+void addToLog(const std::string& username, const std::string& operation);
 
 // Structure to track client information
 struct ClientInfo {
     bool isGuest;
     std::string username;
 };
+
 // Global map to track authenticated clients
 std::map<int, ClientInfo> authenticatedClients;
+
+struct LogEntry {
+    std::string username;
+    std::string operation;
+    std::string timestamp;
+};
+std::map<std::string, std::vector<LogEntry>> userLogs;  // username -> vector of operations
 
 int main() {
     // Create UDP socket for backend servers
@@ -78,8 +91,7 @@ int main() {
     std::cout << "Server M is up and running using UDP on port 24207" << std::endl;
 
 
-
-    
+    std::set<int> clientSockets;  // To track all client connections
 
 
     // Main server loop
@@ -88,7 +100,17 @@ int main() {
         FD_ZERO(&readfds);
         FD_SET(udpSocket, &readfds);
         FD_SET(tcpSocket, &readfds);
+
+        // Add all client sockets to the set
+        for (int sock : clientSockets) {
+            FD_SET(sock, &readfds);
+        }
+        
+        // Calculate max fd including client sockets
         int maxfd = std::max(udpSocket, tcpSocket);
+        for (int sock : clientSockets) {
+            maxfd = std::max(maxfd, sock);
+        }
 
         // Wait for activity on either socket
         int activity = select(maxfd + 1, &readfds, NULL, NULL, NULL);
@@ -133,101 +155,119 @@ int main() {
                 continue;
             }
 
-            // Keep connection alive for multiple commands
-            while (true) {
-                // Handle client message
+            // Debug: Get client's port for logging
+            int clientPort = ntohs(clientAddr.sin_port);
+            std::cout << "Server M received connection from client on port: " << clientPort << std::endl;
+            // Add new client socket to set
+            clientSockets.insert(clientSocket);
+        }
+
+        // Check existing client connections for data
+        std::set<int> socketsToRemove;
+        for (int sock : clientSockets) {
+            if (FD_ISSET(sock, &readfds)) {
                 char buffer[BUFFER_SIZE] = {0};
-                ssize_t tcpBytes = recv(clientSocket, buffer, sizeof(buffer), 0);
+                ssize_t tcpBytes = recv(sock, buffer, sizeof(buffer), 0);
+                
                 if (tcpBytes <= 0) {
+                    // Client disconnected
                     std::cout << "Client disconnected" << std::endl;
-                    authenticatedClients.erase(clientSocket);
-                    break;
+                    socketsToRemove.insert(sock);
+                    authenticatedClients.erase(sock);
+                    continue;
                 }
+
                 buffer[tcpBytes] = '\0';
                 std::string message(buffer);
                 std::istringstream iss(message);
                 std::string first_word;
-                iss >> first_word;    
-                
-                // Debug
-                //std::cout << "\n=== Command Debug Info ===" << std::endl;
-                //std::cout << "Raw message: '" << message << "'" << std::endl;
-                //std::cout << "Command: '" << first_word << "'" << std::endl;
-                //std::cout << "======================" << std::endl;
+                iss >> first_word;
 
-                // Check if this is a command or authentication request
+                // Debug
+                std::cout << "\n=== Command Debug Info ===" << std::endl;
+                std::cout << "Raw message: '" << message << "'" << std::endl;
+                std::cout << "Command: '" << first_word << "'" << std::endl;
+                std::cout << "socket: " << sock << std::endl;
+                std::cout << "======================" << std::endl;
+
+                // Handle commands or authentication
                 if (first_word == "lookup" || first_word == "push" || 
-                    first_word == "deploy" || first_word == "remove") {
-                    // Verify client is authenticated, without auth and type cmd
-                    if (authenticatedClients.find(clientSocket) == authenticatedClients.end()) {
+                    first_word == "deploy" || first_word == "remove" || first_word == "log") {
+                    
+                    // Verify client is authenticated
+                    if (authenticatedClients.find(sock) == authenticatedClients.end()) {
                         std::string error = "Error: Not authenticated";
-                        send(clientSocket, error.c_str(), error.length(), 0);
+                        send(sock, error.c_str(), error.length(), 0);
                         continue;
                     }
-                    ClientInfo& client = authenticatedClients[clientSocket];
-                    // Handle repository operations
+
+                    ClientInfo& client = authenticatedClients[sock];
                     std::string param;
                     iss >> param;  // Get second parameter (username or filename)
 
                     if (first_word == "lookup") {
                         if (param.empty() && !client.isGuest) {
                             // For members, if no username specified, use their own username
+                            addToLog(client.username, "lookup " + param);
                             std::string newMessage(buffer);
                             newMessage = "lookup " + client.username;
-                            handleLookupRequest(udpSocket, clientSocket, newMessage, client.username, false);
+                            handleLookupRequest(udpSocket, sock, newMessage, client.username, false);
                         }
                         else if (param.empty() && client.isGuest) {
                             // For guests, username must be specified
                             std::string error = "Error: Username is required. Please specify a username to lookup.";
-                            send(clientSocket, error.c_str(), error.length(), 0);
+                            send(sock, error.c_str(), error.length(), 0);
                         }
                         else {
                             // Username is specified for either guest or member
-                            handleLookupRequest(udpSocket, clientSocket, message, param, client.isGuest);
+                            handleLookupRequest(udpSocket, sock, message, param, client.isGuest);
                         }
                     }
-                    // Member-only commands
-                    else if (!client.isGuest) {
+                    else if (!client.isGuest) {  // Member-only commands
                         if (first_word == "push") {
                             if (param.empty()) {
                                 std::string error = "Error: Filename is required. Please specify a filename to push.";
-                                send(clientSocket, error.c_str(), error.length(), 0);
+                                send(sock, error.c_str(), error.length(), 0);
                             } else {
                                 // Create new message with username for serverR usage
                                 std::string serverR_message = "push " + client.username + " " + param;
-                                handlePushRequest(udpSocket, clientSocket, serverR_message, client.username); 
+                                addToLog(client.username, "push " + param);
+                                handlePushRequest(udpSocket, sock, serverR_message, client.username); 
                             }
+                        }
+                        else if (first_word == "deploy") {
+                            addToLog(client.username, "deploy");
+                            handleDeployRequest(udpSocket, sock, message, client.username);
                         }
                         else if (first_word == "remove") {
                             if (param.empty()) {
                                 std::string error = "Error: Filename is required for remove operation.";
-                                send(clientSocket, error.c_str(), error.length(), 0);
+                                send(sock, error.c_str(), error.length(), 0);
                             } 
                             else {
-                                handleRemoveRequest(udpSocket, clientSocket, message, client.username);
+                                handleRemoveRequest(udpSocket, sock, message, client.username);
                             }
                         }
-                        else if (first_word == "deploy") {
-                            handleDeployRequest(udpSocket, clientSocket, message, client.username);
+                        else if (first_word == "log") {
+                            addToLog(client.username, "log ");
+                            handleLogRequest(sock, client.username);
                         }
                     }
                     else {
                         std::string error = "Guests can only use the lookup command";
-                        send(clientSocket, error.c_str(), error.length(), 0);
+                        send(sock, error.c_str(), error.length(), 0);
                     }
-                } 
+                }
+                // Handle authentication
                 else {
-                    // authentication request
                     size_t space = message.find(' ');
                     if (space == std::string::npos) {
                         std::string error = "Invalid credentials format";
-                        send(clientSocket, error.c_str(), error.length(), 0);
+                        send(sock, error.c_str(), error.length(), 0);
                         continue;
                     }
-
                     std::string username = message.substr(0, space);
                     std::string password = message.substr(space + 1);
-                    
                     // Print received credentials (hide password)
                     std::string hidden_password(password.length(), '*');
                     std::cout << "Server M has received username " << username 
@@ -238,8 +278,8 @@ int main() {
                         ClientInfo client;
                         client.isGuest = true;
                         client.username = "guest";
-                        authenticatedClients[clientSocket] = client;
-                        send(clientSocket, "guest", 5, 0);
+                        authenticatedClients[sock] = client;
+                        send(sock, "guest", 5, 0);
                         continue;
                     }
 
@@ -270,19 +310,22 @@ int main() {
                         ClientInfo client;
                         client.isGuest = false;
                         client.username = username;
-                        authenticatedClients[clientSocket] = client;
+                        authenticatedClients[sock] = client;
                     }
 
                     // Forward response to client
-                    send(clientSocket, response, bytes, 0);
+                    send(sock, response, bytes, 0);
                     
                     std::cout << "The main server has sent the response from server A to client using TCP over port "
                             << TCP_PORT << "." << std::endl;
                 }
             }
-            close(clientSocket);
         }
-
+        // Remove disconnected clients
+        for (int sock : socketsToRemove) {
+            close(sock);
+            clientSockets.erase(sock);
+        }
     }
 
     // Cleanup (this part won't be reached unless you break the loop)
@@ -329,6 +372,8 @@ void handleLookupRequest(int udpSocket, int clientSocket, const std::string& req
     // Forward response to client
     send(clientSocket, buffer, bytes, 0);
     std::cout << "The main server has sent the response to the client." << std::endl;
+
+
 }
 
 void handlePushRequest(int udpSocket, int clientSocket, const std::string& request,
@@ -419,6 +464,7 @@ void handleRemoveRequest(int udpSocket, int clientSocket, const std::string& req
     std::string command, filename;
     iss >> command >> filename;
 
+    addToLog(username, "remove " + filename);
     // Create new message with username for serverR usage
     std::string serverR_message = "remove " + username + " " + filename;
 
@@ -517,4 +563,30 @@ void handleDeployRequest(int udpSocket, int clientSocket, const std::string& req
     }
 }
 
+void handleLogRequest(int clientSocket, const std::string& username) {
+    std::cout << "The main server has received a log request from member " 
+              << username << " TCP over port " << TCP_PORT << "." << std::endl;
 
+    std::string response;
+    if (userLogs.find(username) != userLogs.end()) {
+        int count = 1;
+        for (const auto& entry : userLogs[username]) {
+            response += std::to_string(count) + ". " + entry.operation + "\n";
+            count++;
+        }
+    }
+
+    send(clientSocket, response.c_str(), response.length(), 0);
+    std::cout << "The main server has sent the log response to the client." << std::endl;
+}
+
+void addToLog(const std::string& username, const std::string& operation) {
+    time_t now = time(0);
+    std::string timestamp = ctime(&now);
+    LogEntry entry = {
+        username,
+        operation,
+        timestamp
+    };
+    userLogs[username].push_back(entry);
+}
