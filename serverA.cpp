@@ -58,7 +58,7 @@ bool authenticateUser(const std::string& username, const std::string& password) 
 
 int main()
 {
-    // Create UDP socket
+    // Create UDP socket(from Beej's)
     int udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
     if (udpSocket < 0)
     {
@@ -66,14 +66,14 @@ int main()
         return 1;
     }
 
-    // Setup address
+    // Setup address(from Beej's)
     struct sockaddr_in serverAddr;
     memset(&serverAddr, 0, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_port = htons(SERVER_A_PORT);
     serverAddr.sin_addr.s_addr = INADDR_ANY;
 
-    // Bind socket
+    // Bind socket(from Beej's)
     if (bind(udpSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
     {
         std::cerr << "Bind failed" << std::endl;
@@ -90,7 +90,7 @@ int main()
         struct sockaddr_in clientAddr;
         socklen_t clientLen = sizeof(clientAddr);
 
-        // Wait for messages from Main Server
+        // Wait for messages from Main Server(from Beej's)
         ssize_t bytesReceived = recvfrom(udpSocket, buffer, sizeof(buffer), 0,
                                          (struct sockaddr *)&clientAddr, &clientLen);
 
@@ -98,7 +98,6 @@ int main()
         {
             buffer[bytesReceived] = '\0';
             // Process authentication request
-            // Parse username and password from received message
             std::string msg(buffer);
             std::istringstream iss(msg);
             std::string username, password;
@@ -114,7 +113,8 @@ int main()
             if (isAuthenticated) {
                 std::cout << "Member " << username << " has been authenticated" << std::endl;
                 response = "member";
-            } else {
+            } 
+            else {
                 std::cout << "The username " << username << " or password "
                          << hidden_password << " is incorrect" << std::endl;
                 response = "invalid";
@@ -123,7 +123,6 @@ int main()
                     (struct sockaddr*)&clientAddr, clientLen);
         }
     }
-
     // Cleanup
     close(udpSocket);
     return 0;

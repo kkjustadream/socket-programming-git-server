@@ -22,28 +22,28 @@ int main(int argc, char *argv[]) {
     std::string username = argv[1];
     std::string password = argv[2];
 
-    // Create TCP socket
+    // Create TCP socket(from Beej's)
     int tcpSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (tcpSocket < 0) {
         std::cerr << "Socket creation failed" << std::endl;
         return 1;
     }
 
-    // Setup server address to connect to
+    // Setup server address to connect to(from Beej's)
     struct sockaddr_in serverAddr;
     memset(&serverAddr, 0, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(SERVER_M_PORT); // Main server's TCP port
+    serverAddr.sin_port = htons(SERVER_M_PORT); 
     serverAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-    // Connect to main server
+    // Connect to main server(from Beej's)
     if (connect(tcpSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) {
         std::cerr << "Connection failed" << std::endl;
         close(tcpSocket);
         return 1;
     }
 
-    // Get client port number after connection
+    // Get client port number after connection(from Beej's)
     struct sockaddr_in clientAddr;
     socklen_t clientLen = sizeof(clientAddr);
     if (getsockname(tcpSocket, (struct sockaddr*)&clientAddr, &clientLen) < 0) {
@@ -72,11 +72,10 @@ int main(int argc, char *argv[]) {
 
     std::string response(buffer);
 
-
     // Process authentication response
     if (strcmp(buffer, "guest") == 0) {
         std::cout << "You have been granted guest access." << std::endl;
-        
+
         // Guest command loop
         while (true) {
             std::cout << "Please enter the command: <lookup <username>>" << std::endl;
@@ -102,10 +101,11 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            // Send command to server
+            std::cout << "Guest sent a lookup request to the main server." << std::endl;
+            // Send command to server(from Beej's)
             send(tcpSocket, command.c_str(), command.length(), 0);
 
-            // Receive response
+            // Receive response(from Beej's)
             memset(buffer, 0, sizeof(buffer));
             bytes = recv(tcpSocket, buffer, sizeof(buffer), 0);
             if (bytes > 0) {
@@ -153,7 +153,7 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            // Send command to serverM
+            // Send command to serverM(from Beej's)
             send(tcpSocket, command.c_str(), command.length(), 0);
 
             if (cmd == "lookup") {
@@ -163,7 +163,7 @@ int main(int argc, char *argv[]) {
                 std::cout << username << " sent a lookup request to the main server." << std::endl;
             }
 
-            // Receive response
+            // Receive response(from Beej's)
             memset(buffer, 0, sizeof(buffer));
             bytes = recv(tcpSocket, buffer, sizeof(buffer), 0);
 
@@ -178,10 +178,10 @@ int main(int argc, char *argv[]) {
                     std::string confirm;
                     std::getline(std::cin, confirm);
 
-                    // Send confirmation back to serverM
+                    // Send confirmation back to serverM(from Beej's)
                     send(tcpSocket, confirm.c_str(), confirm.length(), 0);
 
-                    // Wait for final response
+                    // Wait for final response(from Beej's)
                     memset(buffer, 0, sizeof(buffer));
                     bytes = recv(tcpSocket, buffer, sizeof(buffer), 0);
                     response = buffer;
@@ -206,7 +206,6 @@ int main(int argc, char *argv[]) {
                     if (response == "Empty repository.") {
                         std::cout << response << std::endl;
                     } else {
-                        // Response already contains "The following files..." header
                         // Parse and print each line
                         std::istringstream iss(response);
                         std::string line;
@@ -236,7 +235,6 @@ int main(int argc, char *argv[]) {
                 else {
                     std::cout << response << std::endl;
                 }
-
                 std::cout << "----Start a new request----" << std::endl;
             }
         }

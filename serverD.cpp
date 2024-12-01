@@ -8,10 +8,12 @@
 #include <sstream>
 #include <vector>
 
+#define SERVER_D_PORT 23207
+
 class DeploymentServer {
 private:
     int udpSocket;
-    const int PORT = 23207;  // Your USC ID based port
+    const int PORT = SERVER_D_PORT;
     std::string deployedFile = "deployed.txt";
 
     void saveDeployment(const std::string& username, const std::vector<std::string>& files) {
@@ -27,6 +29,7 @@ public:
         setupSocket();
     }
 
+    // from Beej's
     void setupSocket() {
         udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
         if (udpSocket < 0) {

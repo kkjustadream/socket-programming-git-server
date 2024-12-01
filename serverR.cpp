@@ -9,16 +9,17 @@
 #include <vector>
 #include <map>
 
+#define SERVER_R_PORT 22207
+
 class RepositoryServer {
 private:
     int udpSocket;
     std::map<std::string, std::vector<std::string>> userFiles;
-    const int PORT = 22207;  // Your USC ID
+    const int PORT = SERVER_R_PORT;
 
     void loadFilenames() {
         std::ifstream file("filenames.txt");
         std::string line, username, filename;
-        
         while (std::getline(file, line)) {
             std::istringstream iss(line);
             if (iss >> username >> filename) {
@@ -28,6 +29,7 @@ private:
         file.close();
     }
 
+    //  Grouped by username
     void saveFilenames() {
         std::ofstream file("filenames.txt");
         if (!file.is_open()) {
@@ -46,21 +48,21 @@ private:
 
 public:
     RepositoryServer() {
-        // Create UDP socket
+        // Create UDP socket(from Beej's)
         udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
         if (udpSocket < 0) {
             std::cerr << "Socket creation failed" << std::endl;
             exit(1);
         }
 
-        // Setup address
+        // Setup address(from Beej's)
         struct sockaddr_in serverAddr;
         memset(&serverAddr, 0, sizeof(serverAddr));
         serverAddr.sin_family = AF_INET;
         serverAddr.sin_port = htons(PORT);
         serverAddr.sin_addr.s_addr = INADDR_ANY;
 
-        // Bind socket
+        // Bind socket(from Beej's)
         if (bind(udpSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) {
             std::cerr << "Bind failed" << std::endl;
             close(udpSocket);
@@ -78,9 +80,11 @@ public:
         std::string response;
         if (userFiles.find(username) == userFiles.end()) {
             response = username + " does not exist. Please try again.";
-        } else if (userFiles[username].empty()) {
+        } 
+        else if (userFiles[username].empty()) {
             response = "Empty repository.";
-        } else {
+        } 
+        else {
             for (const auto& file : userFiles[username]) {
                 response += file + "\n";
             }       
@@ -125,7 +129,8 @@ public:
             std::cout << "User requested overwrite; overwrite successful." << std::endl;        
             // File already exists in userFiles, no need to add again
             return "success";
-        } else {
+        } 
+        else {
             std::cout << "Overwrite denied" << std::endl;
             return "Overwrite denied";
         }
@@ -178,10 +183,8 @@ public:
             if (bytesReceived > 0) {
                 std::string request(buffer);
 
-
                 // Debug print
                 //std::cout << "Debug - Received request: '" << request << "'" << std::endl;
-
 
                 std::string response;
                 std::istringstream iss(request);
@@ -208,7 +211,7 @@ public:
                     iss >> username;
                     response = handleDeploy(username);
                 }
-
+                // from Beej's
                 sendto(udpSocket, response.c_str(), response.length(), 0,
                       (struct sockaddr*)&clientAddr, clientLen);
             }

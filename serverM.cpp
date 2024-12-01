@@ -13,6 +13,7 @@
 
 #define TCP_PORT 25207
 #define UDP_PORT 24207
+#define SERVER_R_PORT 22207
 #define BUFFER_SIZE 1024
 
 void handleLookupRequest(int udpSocket, int clientSocket, const std::string& request, 
@@ -32,7 +33,7 @@ struct ClientInfo {
     std::string username;
 };
 
-// Global map to track authenticated clients
+// Track authenticated clients
 std::map<int, ClientInfo> authenticatedClients;
 
 struct LogEntry {
@@ -43,35 +44,35 @@ struct LogEntry {
 std::map<std::string, std::vector<LogEntry>> userLogs;  // username -> vector of operations
 
 int main() {
-    // Create UDP socket for backend servers
+    // Create UDP socket for backend servers(from Beej's)
     int udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
     if (udpSocket < 0) {
         std::cerr << "UDP socket creation failed" << std::endl;
         return 1;
     }
 
-    // Create TCP socket for client communication
+    // Create TCP socket for client communication(from Beej's)
     int tcpSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (tcpSocket < 0) {
         std::cerr << "TCP socket creation failed" << std::endl;
         return 1;
     }
 
-    // Setup UDP address
+    // Setup UDP address(from Beej's)
     struct sockaddr_in udpAddr;
     memset(&udpAddr, 0, sizeof(udpAddr));
     udpAddr.sin_family = AF_INET;
     udpAddr.sin_port = htons(UDP_PORT);
     udpAddr.sin_addr.s_addr = INADDR_ANY;
 
-    // Setup TCP address
+    // Setup TCP address(from Beej's)
     struct sockaddr_in tcpAddr;
     memset(&tcpAddr, 0, sizeof(tcpAddr));
     tcpAddr.sin_family = AF_INET;
     tcpAddr.sin_port = htons(TCP_PORT);
     tcpAddr.sin_addr.s_addr = INADDR_ANY;
 
-    // Bind sockets
+    // Bind sockets(from Beej's)
     if (bind(udpSocket, (struct sockaddr*)&udpAddr, sizeof(udpAddr)) < 0) {
         std::cerr << "UDP bind failed" << std::endl;
         return 1;
@@ -82,7 +83,7 @@ int main() {
         return 1;
     }
 
-    // Listen for TCP connections
+    // Listen for TCP connections(from Beej's)
     if (listen(tcpSocket, 5) < 0) {
         std::cerr << "TCP listen failed" << std::endl;
         return 1;
@@ -96,6 +97,7 @@ int main() {
 
     // Main server loop
     while (true) {
+        // (from Beej's)
         fd_set readfds;
         FD_ZERO(&readfds);
         FD_SET(udpSocket, &readfds);
@@ -106,13 +108,13 @@ int main() {
             FD_SET(sock, &readfds);
         }
         
-        // Calculate max fd including client sockets
+        // Calculate max fd including client sockets for the usage of select
         int maxfd = std::max(udpSocket, tcpSocket);
         for (int sock : clientSockets) {
             maxfd = std::max(maxfd, sock);
         }
 
-        // Wait for activity on either socket
+        // Wait for activity on either socket(from Beej's)
         int activity = select(maxfd + 1, &readfds, NULL, NULL, NULL);
         
         if (activity < 0) {
@@ -126,6 +128,7 @@ int main() {
             struct sockaddr_in senderAddr;
             socklen_t senderLen = sizeof(senderAddr);
             
+            // Stores sender's address information in senderAddr(from Beej's)
             ssize_t udpBytes = recvfrom(udpSocket, buffer, sizeof(buffer), 0, 
                                     (struct sockaddr*)&senderAddr, &senderLen);
             
@@ -133,8 +136,8 @@ int main() {
                 buffer[udpBytes] = '\0';
                 int senderPort = ntohs(senderAddr.sin_port);
  
-                // Process responses from different servers
-                if (senderPort == 21207) { // Server A
+                // Process responses from different servers(R's responses are in handler)
+                if (senderPort == 21207) {      // Server A
                     std::cout << "The main server has received the response from server A using UDP over "
                              << UDP_PORT << std::endl;
                 }
@@ -156,8 +159,9 @@ int main() {
             }
 
             // Debug: Get client's port for logging
-            int clientPort = ntohs(clientAddr.sin_port);
-            std::cout << "Server M received connection from client on port: " << clientPort << std::endl;
+            // int clientPort = ntohs(clientAddr.sin_port);
+            // std::cout << "Server M received connection from client on port: " << clientPort << std::endl;
+
             // Add new client socket to set
             clientSockets.insert(clientSocket);
         }
@@ -167,8 +171,8 @@ int main() {
         for (int sock : clientSockets) {
             if (FD_ISSET(sock, &readfds)) {
                 char buffer[BUFFER_SIZE] = {0};
+                // (from Beej's)
                 ssize_t tcpBytes = recv(sock, buffer, sizeof(buffer), 0);
-                
                 if (tcpBytes <= 0) {
                     // Client disconnected
                     std::cout << "Client disconnected" << std::endl;
@@ -184,11 +188,11 @@ int main() {
                 iss >> first_word;
 
                 // Debug
-                std::cout << "\n=== Command Debug Info ===" << std::endl;
-                std::cout << "Raw message: '" << message << "'" << std::endl;
-                std::cout << "Command: '" << first_word << "'" << std::endl;
-                std::cout << "socket: " << sock << std::endl;
-                std::cout << "======================" << std::endl;
+                // std::cout << "\n=== Command Debug Info ===" << std::endl;
+                // std::cout << "Raw message: '" << message << "'" << std::endl;
+                // std::cout << "Command: '" << first_word << "'" << std::endl;
+                // std::cout << "socket: " << sock << std::endl;
+                // std::cout << "======================" << std::endl;
 
                 // Handle commands or authentication
                 if (first_word == "lookup" || first_word == "push" || 
@@ -270,6 +274,7 @@ int main() {
                     // Forward authentication request to Server A
                     std::cout << "Server M has sent authentication request to Server A" << std::endl;
                     
+                    // from Beej's
                     struct sockaddr_in serverA_addr;
                     serverA_addr.sin_family = AF_INET;
                     serverA_addr.sin_port = htons(21207);
@@ -278,7 +283,7 @@ int main() {
                     sendto(udpSocket, buffer, strlen(buffer), 0, 
                         (struct sockaddr*)&serverA_addr, sizeof(serverA_addr));
 
-                    // Wait for Server A's response
+                    // Wait for Server A's response(from Beej's)
                     struct sockaddr_in responseAddr;
                     socklen_t responseLen = sizeof(responseAddr);
                     char response[BUFFER_SIZE] = {0};
@@ -297,7 +302,7 @@ int main() {
                         authenticatedClients[sock] = client;
                     }
 
-                    // Forward response to client
+                    // Forward response to client(from Beej's)
                     send(sock, response, bytes, 0);
                     
                     std::cout << "The main server has sent the response from server A to client using TCP over port "
@@ -311,8 +316,7 @@ int main() {
             clientSockets.erase(sock);
         }
     }
-
-    // Cleanup (this part won't be reached unless you break the loop)
+    // Cleanup (this part won't be reached unless break the loop)
     close(udpSocket);
     close(tcpSocket);
     return 0;
@@ -331,18 +335,19 @@ void handleLookupRequest(int udpSocket, int clientSocket, const std::string& req
                   << TCP_PORT << "." << std::endl;
     }
 
+    // from Beej's
     struct sockaddr_in serverR_addr;
     serverR_addr.sin_family = AF_INET;
-    serverR_addr.sin_port = htons(22207);  // Server R port
+    serverR_addr.sin_port = htons(SERVER_R_PORT);
     serverR_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
     std::cout << "The main server has sent the lookup request to server R." << std::endl;
 
-    // Forward request to Server R
+    // Forward request to Server R(from Beej's)
     sendto(udpSocket, request.c_str(), request.length(), 0,
            (struct sockaddr*)&serverR_addr, sizeof(serverR_addr));
 
-    // Get response from Server R
+    // Get response from Server R(from Beej's)
     char buffer[BUFFER_SIZE] = {0};
     struct sockaddr_in responseAddr;
     socklen_t responseLen = sizeof(responseAddr);
@@ -356,15 +361,14 @@ void handleLookupRequest(int udpSocket, int clientSocket, const std::string& req
     // Forward response to client
     send(clientSocket, buffer, bytes, 0);
     std::cout << "The main server has sent the response to the client." << std::endl;
-
-
 }
 
 void handlePushRequest(int udpSocket, int clientSocket, const std::string& request,
                       const std::string& username) {
+    // from Beej's                      
     struct sockaddr_in serverR_addr;
     serverR_addr.sin_family = AF_INET;
-    serverR_addr.sin_port = htons(22207);
+    serverR_addr.sin_port = htons(SERVER_R_PORT);
     serverR_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
     std::cout << "The main server has received a push request from " << username 
@@ -372,11 +376,11 @@ void handlePushRequest(int udpSocket, int clientSocket, const std::string& reque
 
     std::cout << "The main server has sent the push request to server R." << std::endl;
 
-    // Forward request to Server R
+    // Forward request to Server R(from Beej's)
     sendto(udpSocket, request.c_str(), request.length(), 0,
            (struct sockaddr*)&serverR_addr, sizeof(serverR_addr));
 
-    // Get response from Server R
+    // Get response from Server R(from Beej's)
     char buffer[BUFFER_SIZE] = {0};
     struct sockaddr_in responseAddr;
     socklen_t responseLen = sizeof(responseAddr);
@@ -390,10 +394,12 @@ void handlePushRequest(int udpSocket, int clientSocket, const std::string& reque
 
     if (response == "exists") {
         // Handle overwrite confirmation
+        std::cout << "The main server has received the response from server R using UDP over" 
+                << UDP_PORT << ", asking for overwrite confirmation" << std::endl;
         std::cout << "The main server has sent the overwrite confirmation request to the client." << std::endl;
         send(clientSocket, buffer, bytes, 0);
 
-        // Wait for client's Y/N response
+        // Wait for client's Y/N response(from Beej's)
         memset(buffer, 0, BUFFER_SIZE);
         bytes = recv(clientSocket, buffer, BUFFER_SIZE, 0);
         
@@ -408,23 +414,20 @@ void handlePushRequest(int udpSocket, int clientSocket, const std::string& reque
         // Create overwrite command message for Server R
         std::string overwriteMsg = "overwrite " + username + " " + filename + " " + std::string(buffer);
 
-        // Forward confirmation to Server R
+        // Forward confirmation to Server R(from Beej's)
         std::cout << "The main server has sent the overwrite confirmation response to server R." << std::endl;
         sendto(udpSocket, overwriteMsg.c_str(), overwriteMsg.length(), 0,
                (struct sockaddr*)&serverR_addr, sizeof(serverR_addr));
 
-        // Get final response from Server R
+        // Get final response from Server R(from Beej's)
         memset(buffer, 0, BUFFER_SIZE);
         bytes = recvfrom(udpSocket, buffer, BUFFER_SIZE, 0,
                         (struct sockaddr*)&responseAddr, &responseLen);
 
-        // Forward final response to client
+        // Forward final response to client(from Beej's)
         send(clientSocket, buffer, bytes, 0);
         std::cout << "The main server has sent the response to the client." << std::endl;
-    } else {        
-        // Print message for normal response
-        std::cout << "The main server has received the response from server R using UDP over "
-                  << UDP_PORT << std::endl;
+    } else {
         // Forward response to client
         send(clientSocket, buffer, bytes, 0);
         std::cout << "The main server has sent the response to the client." << std::endl;
@@ -437,10 +440,10 @@ void handleRemoveRequest(int udpSocket, int clientSocket, const std::string& req
     std::cout << "The main server has received a remove request from member " 
               << username << " TCP over port " << TCP_PORT << "." << std::endl;
 
-    // Forward request to Server R
+    // Forward request to Server R(from Beej's)
     struct sockaddr_in serverR_addr;
     serverR_addr.sin_family = AF_INET;
-    serverR_addr.sin_port = htons(22207);  // Server R port
+    serverR_addr.sin_port = htons(SERVER_R_PORT);
     serverR_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
     // Extract filename from request
@@ -452,11 +455,11 @@ void handleRemoveRequest(int udpSocket, int clientSocket, const std::string& req
     // Create new message with username for serverR usage
     std::string serverR_message = "remove " + username + " " + filename;
 
-    // Send request to Server R
+    // Send request to Server R(from Beej's)
     sendto(udpSocket, serverR_message.c_str(), serverR_message.length(), 0,
            (struct sockaddr*)&serverR_addr, sizeof(serverR_addr));
 
-    // Wait for Server R's response
+    // Wait for Server R's response(from Beej's)
     char buffer[1024] = {0};
     struct sockaddr_in responseAddr;
     socklen_t responseLen = sizeof(responseAddr);
@@ -468,11 +471,10 @@ void handleRemoveRequest(int udpSocket, int clientSocket, const std::string& req
         buffer[bytes] = '\0';
         std::string response(buffer);
 
-        std::cout << "The main server has received confirmation of the remove request done by the server R" 
-                  << std::endl;
-
         // Forward response to client
         if (response == "success") {
+            std::cout << "The main server has received confirmation of the remove request done by the server R" 
+                    << std::endl;
             std::string successMsg = "The remove request was successful.";
             send(clientSocket, successMsg.c_str(), successMsg.length(), 0);
         } else {
@@ -485,10 +487,10 @@ void handleRemoveRequest(int udpSocket, int clientSocket, const std::string& req
 
 void handleDeployRequest(int udpSocket, int clientSocket, const std::string& request,
                         const std::string& username) {
-    // First contact Server R to get files
+    // First contact Server R to get files(from Beej's)
     struct sockaddr_in serverR_addr;
     serverR_addr.sin_family = AF_INET;
-    serverR_addr.sin_port = htons(22207);
+    serverR_addr.sin_port = htons(SERVER_R_PORT);
     serverR_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
     std::cout << "The main server has received a deploy request from member " << username 
@@ -497,12 +499,12 @@ void handleDeployRequest(int udpSocket, int clientSocket, const std::string& req
     // Create new message for serverR usage to lookup
     std::string serverR_message = "lookup " + username;
 
-    // Forward request to Server R
+    // Forward request to Server R(from Beej's)
     std::cout << "The main server has sent the lookup request to server R." << std::endl;
     sendto(udpSocket, serverR_message.c_str(), serverR_message.length(), 0,
            (struct sockaddr*)&serverR_addr, sizeof(serverR_addr));
 
-    // Get response(file list) from Server R
+    // Get response(file list) from Server R(from Beej's)
     char buffer[BUFFER_SIZE] = {0};
     struct sockaddr_in responseAddr;
     socklen_t responseLen = sizeof(responseAddr);
@@ -539,7 +541,7 @@ void handleDeployRequest(int udpSocket, int clientSocket, const std::string& req
         std::string clientResponse = "The following files in his/her repository have been deployed.\n" + fileList;
         send(clientSocket, clientResponse.c_str(), clientResponse.length(), 0);
     }
-    // Need? No file to deploy, empty repository
+    // No file to deploy, empty repository
     else {
         std::cout << "No file to deploy" << std::endl;
         std::string errorMsg = "Empty repository";
@@ -559,7 +561,7 @@ void handleLogRequest(int clientSocket, const std::string& username) {
             count++;
         }
     }
-
+    // from Beej's
     send(clientSocket, response.c_str(), response.length(), 0);
     std::cout << "The main server has sent the log response to the client." << std::endl;
 }
