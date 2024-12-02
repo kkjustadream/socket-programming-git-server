@@ -201,7 +201,7 @@ int main(int argc, char *argv[]) {
                     }
                 }
                 else if (cmd == "deploy") {
-                    std::cout << username << " sent a lookup request to the main server." << std::endl;
+                    std::cout << username << " sent a deploy request to the main server." << std::endl;
                     std::cout << "The client received the response from the main server using TCP over port " << clientPort << std::endl;
                     if (response == "Empty repository.") {
                         std::cout << response << std::endl;

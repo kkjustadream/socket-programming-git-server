@@ -2,3 +2,4 @@
 /shared
 *.html
 .vscode
+*.gz

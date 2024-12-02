@@ -175,7 +175,7 @@ int main() {
                 ssize_t tcpBytes = recv(sock, buffer, sizeof(buffer), 0);
                 if (tcpBytes <= 0) {
                     // Client disconnected
-                    std::cout << "Client disconnected" << std::endl;
+                    // std::cout << "Client disconnected" << std::endl;
                     socketsToRemove.insert(sock);
                     authenticatedClients.erase(sock);
                     continue;
@@ -212,13 +212,14 @@ int main() {
                     if (first_word == "lookup") {
                         if (param.empty() && !client.isGuest) {
                             // For members, if no username specified, use their own username
-                            addToLog(client.username, "lookup " + param);
+                            addToLog(client.username, "lookup");
                             std::string newMessage(buffer);
                             newMessage = "lookup " + client.username;
                             handleLookupRequest(udpSocket, sock, newMessage, client.username, false);
                         }
                         else {
                             // Username is specified for either guest or member
+                            addToLog(client.username, "lookup " + param);
                             handleLookupRequest(udpSocket, sock, message, param, client.isGuest);
                         }
                     }
@@ -257,19 +258,8 @@ int main() {
                     std::string username = message.substr(0, space);
                     std::string password = message.substr(space + 1);
                     // Print received credentials (hide password)
-                    std::string hidden_password(password.length(), '*');
                     std::cout << "Server M has received username " << username 
-                            << " and password " << hidden_password << "." << std::endl;
-
-                    // Handle guest authentication
-                    if (username == "guest" && password == "guest") {
-                        ClientInfo client;
-                        client.isGuest = true;
-                        client.username = "guest";
-                        authenticatedClients[sock] = client;
-                        send(sock, "guest", 5, 0);
-                        continue;
-                    }
+                            << " and password ****." << std::endl;
 
                     // Forward authentication request to Server A
                     std::cout << "Server M has sent authentication request to Server A" << std::endl;
@@ -299,6 +289,12 @@ int main() {
                         ClientInfo client;
                         client.isGuest = false;
                         client.username = username;
+                        authenticatedClients[sock] = client;
+                    }
+                    else if (strcmp(response, "guest") == 0) {
+                        ClientInfo client;
+                        client.isGuest = true;
+                        client.username = "guest";
                         authenticatedClients[sock] = client;
                     }
 
@@ -389,12 +385,10 @@ void handlePushRequest(int udpSocket, int clientSocket, const std::string& reque
                             (struct sockaddr*)&responseAddr, &responseLen);
 
     std::string response(buffer);
-    std::cout << "The main server has received the response from server R using UDP over "
-              << UDP_PORT << std::endl;
 
     if (response == "exists") {
         // Handle overwrite confirmation
-        std::cout << "The main server has received the response from server R using UDP over" 
+        std::cout << "The main server has received the response from server R using UDP over " 
                 << UDP_PORT << ", asking for overwrite confirmation" << std::endl;
         std::cout << "The main server has sent the overwrite confirmation request to the client." << std::endl;
         send(clientSocket, buffer, bytes, 0);
@@ -423,11 +417,14 @@ void handlePushRequest(int udpSocket, int clientSocket, const std::string& reque
         memset(buffer, 0, BUFFER_SIZE);
         bytes = recvfrom(udpSocket, buffer, BUFFER_SIZE, 0,
                         (struct sockaddr*)&responseAddr, &responseLen);
+        std::cout << "The main server has received the response from server R using UDP over " << UDP_PORT << std::endl;
 
         // Forward final response to client(from Beej's)
         send(clientSocket, buffer, bytes, 0);
         std::cout << "The main server has sent the response to the client." << std::endl;
     } else {
+        std::cout << "The main server has received the response from server R using UDP over "
+                << UDP_PORT << std::endl;
         // Forward response to client
         send(clientSocket, buffer, bytes, 0);
         std::cout << "The main server has sent the response to the client." << std::endl;
@@ -555,10 +552,12 @@ void handleLogRequest(int clientSocket, const std::string& username) {
 
     std::string response;
     if (userLogs.find(username) != userLogs.end()) {
-        int count = 1;
-        for (const auto& entry : userLogs[username]) {
-            response += std::to_string(count) + ". " + entry.operation + "\n";
-            count++;
+        const auto& logs = userLogs[username];
+        for (size_t i = 0; i < logs.size(); ++i) {
+            response += std::to_string(i + 1) + ". " + logs[i].operation;
+            if (i < logs.size() - 1) {
+                response += "\n";
+            }
         }
     }
     // from Beej's

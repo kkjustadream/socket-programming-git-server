@@ -103,9 +103,17 @@ int main()
             std::string username, password;
             iss >> username >> password;            
             // Print received authentication request
-            std::string hidden_password(password.length(), '*');
             std::cout << "ServerA received username " << username 
-                      << " and password " << hidden_password << std::endl;
+                      << " and password *****" << std::endl;
+
+            // Check for guest credentials first(from Beej's)
+            if (username == "guest" && password == "guest") {
+                std::string response = "guest";
+                sendto(udpSocket, response.c_str(), response.length(), 0,
+                    (struct sockaddr*)&clientAddr, clientLen);
+                continue;
+            }
+            
             // Authenticate user
             bool isAuthenticated = authenticateUser(username, password);
             // Send response back to Main Server            
@@ -115,8 +123,7 @@ int main()
                 response = "member";
             } 
             else {
-                std::cout << "The username " << username << " or password "
-                         << hidden_password << " is incorrect" << std::endl;
+                std::cout << "The username " << username << " or password ***** is incorrect" << std::endl;
                 response = "invalid";
             }
             sendto(udpSocket, response.c_str(), response.length(), 0,
